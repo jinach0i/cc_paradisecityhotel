@@ -1,0 +1,121 @@
+/**
+ * 오퍼 팝업 관련 스크립트
+ */
+var hp;
+var OfferPopup = function() {
+	var popupData;
+
+	this.init = function(obj) {
+		popupData = obj;
+	};
+
+	this.createPopup = function() {
+		var html;
+
+		if(!popupData) return;
+
+		$.map(popupData, function(key, value) {
+			html = '';
+			html += '<div class="layerPopWrap" id="' + popupData[value].id + '">';
+			html += '    <div class="bg"></div>';
+			html += '    <div class="layerPopCont" style="padding: 24px 22px 0px; top: 50%; margin-top: -216.5px;">';
+			html += '        <div class="loginWrap">';
+			html += '            <h1 class="pt15i pb15i">';
+			html += '                <span class="layerTitleText fw500">' + popupData[value].title + '</span> ';
+			html += '            </h1>';
+			html += '            <div class="loginBox">';
+
+			$.each(popupData[value].contentAr, function(i, v) {
+				html += '<p class="pb15i ' + popupData[value].classAr[i] + '">' + v + '</p>';
+			});
+
+			html += '                <div class="termTxt pb15i">';
+			html += '                    <table class="bdNone">';
+			html += '                        <tbody>';
+			html += '                            <tr class="btnAreaTr bdNone">';
+			html += '                                <td colspan="2" class="bdNone">';
+			html += '                                    <a href="#" class="dpi btn small full btnFull closePop">';
+			html += '                                        <span class="LayerbtnLeft">닫기</span>';
+			html += '                                    </a>';
+			html += '                                </td>';
+			html += '                            </tr>';
+			html += '                        </tbody>';
+			html += '                    </table>';
+			html += '                </div>';
+			html += '            </div>';
+			html += '        </div>';
+			html += '    <a href="#" class="layerPopClose closePop"></a>';
+			html += '</div>';
+			html += '</div>';
+
+			$('body').append(html);
+		});
+
+		bindClickEvent();
+	};
+
+	var bindClickEvent = function() {
+		$(document).on('click','.cimerNotice', function(e) {
+			e.preventDefault();
+
+			$('#' + popupData.cimer.id).addClass('on');
+		});
+
+		$(document).on('click','.wonderboxNotice', function(e) {
+			e.preventDefault();
+
+			$('#' + popupData.wonderbox.id).addClass('on');
+		});
+
+		$(document).on('click','.closePop', function(e) {
+			e.preventDefault();
+
+			$(this).parents('.layerPopWrap').removeClass('on');
+		});
+	};
+};
+
+$(function() {
+	if(!hp) hp = {};
+
+	hp.OfferPopup = new OfferPopup();
+});
+
+function jsChkReservationRemove(obj) {
+	var offer_type_cd = $("#O_TYPE_CD").val();
+	var offer_type_nm = "";
+
+	if ( offer_type_cd == "000001" ) {
+		offer_type_nm = "Hotel Paradise";
+	} else if ( offer_type_cd == "000002" ) {
+		offer_type_nm = "Hotel Art Paradiso";
+	} else if ( offer_type_cd == "000003" ) {
+		offer_type_nm = "Art Space";
+	} else if ( offer_type_cd == "000004" ) {
+		offer_type_nm = "Cimer";
+	} else if ( offer_type_cd == "000005" ) {
+		offer_type_nm = "Chroma";
+	} else if ( offer_type_cd == "000006" ) {
+		offer_type_nm = "Wonderbox";
+	}
+
+	if ( jsCheckMobileDevice() ) { // 모바일용
+		//팝업열기
+		var form = $('<form>').attr('action', '/front/inquiry/reservation');
+		var input = $('<input>').attr({ type: 'hidden', name: 'QUESTION', value: offer_type_cd });
+		var jsViewCd = $('<input>').attr({ type: 'hidden', name: 'VIEW_CD', value: 'D' });
+		$(form).append(input);
+		$(form).append(jsViewCd);
+		$('body').append(form);
+
+		submitGet($(form));
+	} else {	// WEB용
+		// OFFER 예약문의 팝업열기
+		layerPopOpen("#INQUIRYPOP");
+		selectVal("#QUESTION", offer_type_nm);
+		$("#VIEW_CD").selectVal("D");
+		// 현팝업 닫기
+		$("body").removeClass("hidden");
+		$("#detailPop1").remove();
+	}
+}

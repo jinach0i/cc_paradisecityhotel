@@ -1,0 +1,518 @@
+/**
+ * 구글 애널리틱스 관련 스크립트
+ */
+var hp;
+
+var Analytics = function() {
+	var offerDataSet; // 오퍼 데이터를 담을 객체
+	var offerCartData; // 장바구시 결제 진행시 데이터
+	var offerCartStepData; // 장바구시 결제 진행시 데이터
+
+	/**
+	 * 상품 데이터 존재여부 체크
+	 * @return Boolean : 오퍼 상품 데이터 존재여부
+	 */
+	this.isData = function() {
+		return !!offerDataSet;
+	};
+
+	/**
+	 * /**
+	 * 내부 변수에 오퍼 데이터 저장
+	 * @param data : 오브젝트 객체
+	 */
+	this.setOfferData = function(data) {
+		offerDataSet = data;
+	};
+
+	/**
+	 * 내부 변수에 결제 진행용 데이터 저장
+	 * @param data : 오브젝트 객체
+	 */
+	this.setOfferCartData = function(data) {
+		offerCartData = data;
+	};
+
+	/**
+	 * 로걸 저장소에 데이터 저장
+	 * @param key : string 아이디
+	 * @param data : string 데이터
+	 */
+	var setLocalStorageData = function(key, data) {
+		if(localStorage) {
+			localStorage.clear();
+
+			localStorage.setItem(key, data);
+		}
+	};
+
+	/**
+	 * 로걸 저장소에서 데이터 가져오기 
+	 * @param key : 저장 아이디
+	 */
+	this.getLocalStorageData = function(key) {
+		if(localStorage) {
+			return localStorage.getItem(key);
+		}
+	};
+
+	/**
+	 * 결제 상품 옵션 데이터 생성
+	 * @return Array : 체크인 데이터 배열
+	 */
+	this.productOptionDataSet = function() {
+		var returnData = {
+			//checkIn: checkInDataSet(),
+			room: roomDataSet(),
+			etc: etcDataSet()
+		};
+
+		return returnData;
+	};
+
+	/**
+	 * 체크인 옵션 데이터 생성
+	 * @return Array : 체크인 데이터 배열
+	 */
+	var checkInDataSet = function() {
+		var returnData = [];
+		var dataArr;
+		var name;
+
+		$.each($('.selectChoice'), function(i, v) {
+			dataArr = [];
+			name = $(v).parents('.reservationWrap').find('.reservationInfoWrap').eq(i).find('h1').text().toLocaleUpperCase();
+
+			$.each($(v).find('.ui-select-wrapper'), function(si, sv) {
+				if($(sv).find('.ui-select-trigger').text() > 0) {
+					dataArr.push({ 
+						name: name,
+						label: $(sv).parent().prev().attr('title'),
+						value: $(sv).find('.ui-select-trigger').text()
+					});
+				}
+			});
+
+			returnData.push(dataArr);
+		});
+
+		return returnData;
+	};
+
+	/**
+	 * 객실 옵션 데이터 생성
+	 * @return Array : 객실 옵션 데이터 배열
+	 */
+	var roomDataSet = function() {
+		var returnData = [];
+
+		$.each($('.slick-initialized'), function(i, v) {
+			returnData.push({ 
+				name: $(v).parents('.reservationWrap').find('.reservationInfoWrap').eq(i).find('h1').text().toLocaleUpperCase(),
+				label: $(v).find('input[name=RR_SEQ_TA' + i + ']:checked').parents('.roomInfo').find('h3').text(),
+				value: $(v).find('input[name=RR_SEQ_TA' + i + ']:checked').next().text()
+			});
+		});
+
+		return returnData;
+	};
+	
+	/**
+	 * 추가 옵션 데이터 생성
+	 * @return Array : 추가 옵션 데이터 배열
+	 */
+	var etcDataSet = function() {
+		var returnData = [];
+		var dataArr;
+		var name;
+
+		$.each($('.optionInfo'), function(i, v) {
+			dataArr = [];
+			name = $(v).parents('.reservationWrap').find('.reservationInfoWrap').eq(i).find('h1').text().toLocaleUpperCase();
+
+			$.each($(v).find('div.selectBox'), function(si, sv) {
+				if($(sv).find('.ui-select-trigger').text() != '선택') {
+					dataArr.push({ 
+						name: name,
+						label: $(sv).parents('dd').prev().text(),
+						value: $(sv).find('.ui-select-trigger').text()
+					});
+				}
+			});
+
+			returnData.push(dataArr);
+		});
+
+		return returnData;
+	};
+
+	/**
+	 * 상품 상세정보 조회(탭 코드&아이디 기준)
+	 * @param id:  탭 코드 + 아이디
+	 * @return resultData : 상품 데이터
+	 */
+	this.getofferDetail = function(id) {
+		var rpSeq = id.substring(2);
+		var rpCategory = id.substring(0, 2);
+		var resultData = '';
+
+		$.each(offerDataSet.data[['rs' + rpCategory]], function(i, v) {
+			if(v.RP_SEQ == rpSeq)
+				resultData = v;
+		});
+
+		return resultData;
+	};
+
+	/**
+	 * 상품 상세정보 조회(아이디 OR 상품명 기준)
+	 * @return resultData : 상품 데이터
+	 * @param rpSeq
+	 */
+	this.getofferDetailBySeq = function(rpSeq) {
+		var resultData = '';
+		var isIdSearch = isNaN(rpSeq) ? false : true;
+
+		try {
+			$.each(offerDataSet.id, function(i, v) {
+				$.each(offerDataSet.data[['rs' + v]], function(si, sv) {
+					if(isIdSearch && sv.RP_SEQ == rpSeq) {
+						resultData = sv;
+					} else if(!isIdSearch && sv.RP_NAME == rpSeq) {
+						resultData = sv;
+					}
+				});
+			});
+		} catch(e) {}
+
+		return resultData;
+	};
+
+	/**
+	 * 조회된 상품 목록 정보 배열로 리턴
+	 * @param idArr 상품 카테고리 코드 리스트
+	 * @param data 조회된 상품 목록 데이터
+	 * @return Array : dataLayer에 담을 상품 정보 목록 
+	 */
+	this.getProductInfoList = function(idArr, data) {
+		var dataArr = [];
+		var productName;
+		var productList;
+
+		offerDataSet.data = data;
+
+		setLocalStorageData('offerData', JSON.stringify(offerDataSet.data));
+
+		$.each(idArr, function(i, v) {
+			productList = data["rs" + v];
+
+			$.each(productList, function(si, sv) {
+				productName = sv.RP_NAME.toLocaleUpperCase();
+
+				dataArr.push({
+					'id': sv.RP_SEQ + '', // 상품 아이디
+					'name': productName, // 상품명
+					'category': sv.OFFER_TYPE_CD,
+					'price': sv.SALE_PRC ? sv.SALE_PRC : 0 + '',
+					'list': productName
+				});
+			});
+		});
+
+		return dataArr;
+	};
+
+	/**
+	 * 상품 목록 조회시 애널리틱스 호출
+	 * @param idArr : 선택된 상품 카테고리
+	 * @param data : 조회한 데이터
+	 */
+	this.sendProductList = function(idArr, data) {
+		var viewIdArr;
+
+		offerDataSet = {};
+		offerDataSet.id = idArr;
+
+		// 상단 호텔탭 선택시
+		if($('.reserveSelectWrap .reserveTab li.on').index() == 0) {
+			viewIdArr = idArr.slice(0, 2);
+		} else { // 상단 엔터테이먼트탭 선택시
+			viewIdArr = idArr.slice(2, 4);
+		}
+
+		var dataArr = hp.Analytics.getProductInfoList(viewIdArr, data);
+
+		sendProeuctList(dataArr);
+	};
+
+	/**
+	 * 상단탭 클릭시 해당 상품정보 애널리틱스 호출
+	 * @param tabCd : 탭 코드
+	 */
+	this.sendProductListByTabClick = function(tabCd) {
+		var viewIdArr;
+
+		if(tabCd == 'HTL') {
+			viewIdArr = offerDataSet.id.slice(0, 2);
+		} else {
+			viewIdArr = offerDataSet.id.slice(2, 4);
+		}
+
+		var dataArr = hp.Analytics.getProductInfoList(viewIdArr, offerDataSet.data);
+
+		sendProeuctList(dataArr);
+	};
+
+	/**
+	 * 상품 목록 정보 에너리틱스 전송
+	 * @param dataArr : 보낼 상품 정보 리스트
+	 */
+	var sendProeuctList = function(dataArr) {
+		dataLayer.push({
+			'event': 'offerView',
+			'ecommerce': {
+				'currencyCode':'KRW',
+				'impressions': dataArr
+			}
+		});
+	};
+
+	/**
+	 * 상품 상세보기 클릭시 애널리틱스에 정보 호출
+	 * @param rpSeq : 상품 번호
+	 * @param data : 상품 상세 정보
+	 */
+	this.sendDetailInfo = function(rpSeq, data) {
+		var productName = data.RP_NAME.toLocaleUpperCase();
+
+		// 태그매니저 개발
+		dataLayer.push({
+			'event': 'offerProductClick',
+			'ecommerce': {
+				'click': {
+					'actionField': {'list': productName, 'action': 'click' },
+					'products': [{
+						'id': rpSeq + '',
+						'name': productName, 
+						'category': data.OFFER_TYPE_CD,
+						'price': data.SALE_PRC ? data.SALE_PRC : 0 + '',
+						'position': 0
+					}]
+				}
+			}
+		});
+	};
+
+	/**
+	 * 장바구니 담기시 애널리틱스 호출
+	 * @param id : 상품번호
+	 */ 
+	this.sendAddCart = function(id) {
+		// 선택한 상품 데이터
+		var detailData = hp.Analytics.getofferDetail(id);
+
+		if(detailData) {
+			var productName = detailData.RP_NAME.toLocaleUpperCase();
+
+			dataLayer.push({
+				'event': 'addToCart',
+				'ecommerce': {
+					'currencyCode': 'KRW',
+					'add': {
+						'actionField': { 'list': productName },
+						'products': [{
+							'id': detailData.RP_SEQ + '',
+							'name': productName,
+							'price': detailData.SALE_PRC ? detailData.SALE_PRC : 0 + '',
+							'category': detailData.OFFER_TYPE_CD,
+							'quantity': 1
+						}]
+					}
+				}
+			});
+		}
+	};
+
+	/**
+	 * 장바구니 삭제시 에널리틱스 호출
+	 * @param rpSeq : 상품번호
+	 */
+	this.sendRemoveProduct = function(rpSeq) {
+		var detailDataArr = [];
+		var products = [];
+		var productObj;
+		var productName;
+
+		// 전체 삭제
+		if(Array.isArray(rpSeq)) {
+			$.each(rpSeq, function(i, v) {
+				detailDataArr.push(hp.Analytics.getofferDetailBySeq(v));
+			});
+		} else { // 단건 삭제
+			detailDataArr.push(hp.Analytics.getofferDetailBySeq(rpSeq));
+		}
+
+		try {
+			$.each(detailDataArr, function(i, v) {
+				productName = v.RP_NAME.toLocaleUpperCase();
+
+				dataLayer.push({
+					'event': 'removeFromCart',
+					'ecommerce': {
+						'currencyCode': 'KRW',
+						'remove': {
+							'actionField': { 'list': productName },
+							'products': [{
+								'id': v.RP_SEQ + '',
+								'name': productName,
+								'price': v.SALE_PRC ? v.SALE_PRC : 0 + '',
+								'category': v.OFFER_TYPE_CD,
+								'quantity': 1
+							}]
+						}
+					}
+				});
+			});
+		} catch(e) {}
+	};
+
+	/**
+	 * 장바구니 상품 상세설정 정보 전송
+	 */
+	this.sendCartDetailSet = function(data) {
+		var productName;
+		var productData;
+		var title;
+
+		if(data) {
+			offerCartStepData = [];
+
+			$.map(data, function(value, key) {
+				title = key == 'checkIn' ? '체크인 옵션 : ' : key == 'room' ? '객실 옵션 : ' : '추가 옵션 : ';
+
+				$.each(value, function(i, v) {
+					if(Array.isArray(v)) {
+						$.each(v, function(si, sv) {
+							productData = {
+								name: sv.name,
+								label: title + sv.label + (key == 'room' ? '(' + sv.value + ')' : ''),
+								quantity: key != 'room' ? sv.value.replace(/명/, '') : 1
+							};
+
+							offerCartStepData.push(productData);
+							sendCartDetail(productData);
+						});
+					} else {
+						productData = {
+							name: v.name,
+							label: title + v.label + (key == 'room' ? '(' + v.value + ')' : ''),
+							quantity: key != 'room' ? v.value.replace(/명/, '') : 1
+						};
+
+						offerCartStepData.push(productData);
+						sendCartDetail(productData);
+					}
+				});
+			});
+		}
+	};
+
+	/**
+	 * 장바구니 상품 상세설정 정보 전송
+	 * @param data : 상품 목록
+	 */
+	var sendCartDetail  = function(data) {
+		dataLayer.push({
+			'event': 'productStep1',
+			'ecommerce': {
+				'checkout': {
+					'actionField': { 'list': data.name, 'step': 1 },
+					'products': [{
+						'id': 'HPCP',
+						'name': data.label,
+						'quantity': data.quantity
+					}]
+				}
+			}
+		});
+	};
+
+	/**
+	 * 장바구니 상품 결제수단 정보 전송
+	 * @param option : 결제 수단
+	 */
+	this.sendCartDetail  = function(option) {
+		$.each(offerCartStepData, function(i, v) {
+			dataLayer.push({
+				'event': 'productStep1',
+				'ecommerce': {
+					'checkout': {
+						'actionField': { 'list': v.name, 'step': 2 },
+						'products': [{
+							'option': option,
+						}]
+					}
+				}
+			});
+		});
+	};
+
+	/**
+	 * 결제 정보 전송
+	 */
+	this.sendPaymentResultData = function(data)  {
+		var offerData = JSON.parse(hp.Analytics.getLocalStorageData('offerData'));
+		var productData;
+		var productArr = [];
+		offerDataSet = {
+			id: ['HP', 'PK', 'TK', 'AP'],
+			data: offerData
+		};
+
+		$.each(data.productPaymentArr, function(i, v) {
+			productData = hp.Analytics.getofferDetailBySeq(v.name);
+
+			if(productData) {
+				productArr.push({
+					id: productData.RP_SEQ,
+					name: productData.RP_NAME.toLocaleUpperCase(),
+					category: productData.OFFER_TYPE_CD,
+					quantity: 1,
+					price: v.price,
+				});
+			}
+		});
+
+		dataLayer.push({
+			event: 'paymentResult',
+			ecommerce: {
+				currencyCode: 'KRW',
+				purchase: {
+					actionField: {
+						id: data.id,
+						revenue: data.total
+					}, 
+					products: productArr
+				}
+			}
+		});
+	};
+
+	/**
+	 * 예약정보 취소 정보 애널리틱스 전송
+	 * @param resNo : 예약번호
+	 */
+	this.cancelProductOrder = function(resNo) {
+		dataLayer.push({
+			event: 'paymentCancel',
+			ecommerce: {
+				refund: { actionField: { id: resNo } }
+			}
+		});
+	};
+};
+
+$(function() {
+	hp = {};
+	hp.Analytics = new Analytics();
+});
